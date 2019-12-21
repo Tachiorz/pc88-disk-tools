@@ -19,63 +19,81 @@ d88_header_unpack = Struct(d88_header_fmt).unpack_from
 #	BYTE density, del, stat;
 #	BYTE rsrv[5];
 #	WORD size;
-sector_header_fmt = '<BBBBsBBB5sI'
+sector_header_fmt = '<BBBBHBBB5sH'
 sector_header_len = calcsize(sector_header_fmt)
 sector_header_unpack = Struct(sector_header_fmt).unpack_from
 
+DENSITY_DOUBLE = 0
+DENSITY_HIGH = 1
+DENSITY_SINGLE = 64
+
+
+class D88IMAGE:
+    tracks_dir = ()  # (side 0 = [cylinder...]={sector...}, side 1 = [cylinder...]={sector...})
+
+    def __init__(self, sides=2, density=DENSITY_HIGH, sectors=26,sector_size=256):
+        self.tracks_dir = ([], [])
+        # todo: init new diskette image
+        pass
+
+    def sector_size_to_bytes(self, sector_size):
+        return 0x80 << sector_size
+
+    def density_to_string(self, density):
+        if density == DENSITY_DOUBLE:
+            return "double"
+        elif density == DENSITY_HIGH:
+            return "high"
+        elif density == DENSITY_SINGLE:
+            return "single"
+        else:
+            raise ("Unknown density " + density + ", could be single?")
+
+    def load(self, filename):
+        with open(filename, 'rb') as f:
+            raw = f.read(d88_header_len)
+            d88_header = d88_header_unpack(raw)
+            (title, rsrv, protect, type, size) = d88_header
+            # tracks = array.array('I')
+            # tracks.read(f, 164) # trkptr structure
+            # tracks = tracks.tolist()
+            tracks = unpack("164I", f.read(164 * 4))
+            print('Filename:', filename)
+            print('Title:', title.decode())
+            # print 'Tracks:', tracks
+            actual_tracks = list(filter(lambda x: x > 0, tracks))
+            print('Tracks actually in use:', len(actual_tracks))
+
+            self.tracks_dir = ([], [])
+            for track_origin in actual_tracks:
+                f.seek(track_origin)
+                raw = f.read(sector_header_len)
+                track_header = sector_header_unpack(raw)
+                (c, h, r, sector_size, nsec, density, _del, stat, rsrv, size) = track_header
+                f.seek(track_origin)
+                cur_head = h
+                self.tracks_dir[h].append({})
+                for sec_id in range(nsec):
+                    track_header = sector_header_unpack(f.read(sector_header_len))
+                    (c, h, r, sector_size, nsec, density, _del, stat, rsrv, size) = track_header
+                    #print('Cylinder', c, 'Head', h, 'Sector', r, end=' ')
+                    #print('Sector size (in bytes):', self.sector_size_to_bytes(sector_size), end=' ')
+                    #print('Density:', self.density_to_string(density))
+                    if self.sector_size_to_bytes(sector_size) != size:
+                        raise Exception("Malformated sector size")
+                    if cur_head != h:
+                        raise Exception("Head out of order")
+                    self.tracks_dir[h][c][r] = f.read(size)
+
+
 def usage():
-    print sys.argv[0] + " [d88 file]"
+    print(sys.argv[0] + " [d88 file]")
 
-if len(sys.argv) < 2:
-    usage()
-    sys.exit(1)
 
-def sector_size_to_bytes(sector_size):
-    if sector_size == 0:
-        return 128
-    elif sector_size == 1:
-        return 256
-    elif sector_size == 2:
-        return 512
-    elif sector_size == 3:
-        return 1024
-    else:
-        raise "Unknown sector size " + sector_size
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        usage()
+        sys.exit(1)
 
-def density_to_string(density):
-    if density == 0:
-        return "double"
-    elif density == 1:
-        return "high"
-    else:
-        raise "Unknown density " + density + ", could be single?"
-
-with open(sys.argv[1], 'rb') as f:
-    raw = f.read(d88_header_len)
-    d88_header = d88_header_unpack(raw)
-    (title, rsrv, protect, type, size) = d88_header
-    tracks = array.array('I')
-    tracks.read(f, 164) # trkptr structure
-    tracks = tracks.tolist()
-    print 'Filename:', sys.argv[1]
-    print 'Title:', title
-    #print 'Tracks:', tracks
-    actual_tracks = filter(lambda x: x > 0, tracks)
-    print 'Tracks actually in use:', len(actual_tracks)
-
-    # i suspect it goes TRK - SEC and track headers are the same
-    i = 0
-    for track_origin in actual_tracks:
-        print 'Track #', i
-
-        f.seek(track_origin)
-        raw = f.read(sector_header_len)
-        track_header = sector_header_unpack(raw)
-        #print track_header
-        (c, h, r, sector_size, nsec, density, _del, stat, rsrv, size) = track_header
-        print 'Cylinder', c, 'Head', h, 'Sector', r
-        print 'Sector size (in bytes):', sector_size_to_bytes(sector_size)
-        print 'Density:', density_to_string(density)
-        #break # FIXME
-
-        i += 1
+    image = D88IMAGE()
+    image.load(sys.argv[0])

@@ -2,9 +2,10 @@ import os
 import sys
 from collections import namedtuple
 import struct
+import n88basic
 from d88 import D88IMAGE
 
-DEBUG = True
+DEBUG = False
 
 def usage():
     print("Extract files from N88 BASIC disk")
@@ -41,6 +42,8 @@ if __name__ == "__main__":
         usage()
         sys.exit(1)
 
+    decompile = True
+
     image = D88IMAGE()
     image.load(sys.argv[1])
 
@@ -74,7 +77,7 @@ if __name__ == "__main__":
     # Values:
     # 0xFF: empty cluster
     # 0xFE: cluster can't be used
-    output_dir = sys.argv[1] + '_DUMP'
+    output_dir = sys.argv[1] + '_DUMP\\'
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
     FAT = image.tracks_dir[0][35][24] + image.tracks_dir[0][35][25] + image.tracks_dir[0][35][26]
@@ -83,7 +86,8 @@ if __name__ == "__main__":
         if di.fileext != '': filename += '.' + di.fileext
         print(filename, file_attribute_to_string(di.attribute))
         cluster = di.first_cluster
-        with open(output_dir + '\\' + filename, 'wb') as f:
+        with open(output_dir + filename, 'wb') as f:
+            buf = b''
             while True:
                 if DEBUG: print(cluster, end=",")
 
@@ -92,13 +96,24 @@ if __name__ == "__main__":
                 head, track = cluster_to_head_track(cluster)
                 if last_cluster:
                     sector_count = FAT[cluster] & 0x1F
-                    print("sectors:", sector_count)
+                    if DEBUG: print("sectors:", sector_count)
                 else:
                     sector_count = len(image.tracks_dir[head][track])
 
                 for s in range(1, sector_count + 1):
-                    f.write(image.tracks_dir[head][track][s])
+                    buf += image.tracks_dir[head][track][s]
                 if last_cluster:
                     break
                 cluster = FAT[cluster]
+            if decompile:
+                decompile_dir = output_dir + 'decompile\\'
+                if not os.path.exists(decompile_dir):
+                    os.mkdir(decompile_dir)
+                try:
+                    dec = n88basic.decompile(buf)
+                    with open(decompile_dir + filename, 'wb') as fd:
+                        fd.write(dec)
+                except:
+                    pass
+            f.write(buf)
 

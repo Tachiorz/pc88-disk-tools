@@ -64,15 +64,13 @@ class D88IMAGE:
             actual_tracks = list(filter(lambda x: x > 0, tracks))
             print('Tracks actually in use:', len(actual_tracks))
 
-            self.tracks_dir = ([], [])
+            self.tracks_dir = ({}, {})
             for track_origin in actual_tracks:
                 f.seek(track_origin)
                 raw = f.read(sector_header_len)
                 track_header = sector_header_unpack(raw)
                 (c, h, r, sector_size, nsec, density, _del, stat, rsrv, size) = track_header
                 f.seek(track_origin)
-                cur_head = h
-                self.tracks_dir[h].append({})
                 for sec_id in range(nsec):
                     track_header = sector_header_unpack(f.read(sector_header_len))
                     (c, h, r, sector_size, nsec, density, _del, stat, rsrv, size) = track_header
@@ -81,8 +79,8 @@ class D88IMAGE:
                     #print('Density:', self.density_to_string(density))
                     if self.sector_size_to_bytes(sector_size) != size:
                         raise Exception("Malformated sector size")
-                    if cur_head != h:
-                        raise Exception("Head out of order")
+                    if c not in self.tracks_dir[h]:
+                        self.tracks_dir[h][c] = {}
                     self.tracks_dir[h][c][r] = f.read(size)
 
 

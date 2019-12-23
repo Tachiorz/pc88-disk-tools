@@ -262,6 +262,9 @@ n88_unicode_table = {
     0xf7: 0x0E007,
 }
 
+n88_2byte_unicode_table = {
+    0x242C: 0xF242C,
+}
 
 def n88basic_to_utf8(txt):
     out = b""
@@ -275,8 +278,20 @@ def n88basic_to_utf8(txt):
             jis = b""
         elif i < len(txt)-1 and txt[i] == 0x1b and txt[i + 1] == 0x48:  # switch to 8bit
             is_jis = False
-            jis = bytes([0x1b, 0x24, 0x42]) + jis + bytes([0x1b, 0x28, 0x42])
-            jis = jis.decode('iso2022_jp_ext')
+            try:
+                jis2 = ""
+                for j in range(0,len(jis), 2):
+                    bcode = jis[j:j+2]
+                    code = struct.unpack('<H', bcode)[0]
+                    if code in n88_2byte_unicode_table:
+                        jis2 += chr(n88_2byte_unicode_table[code])
+                    else:
+                        bcode = bytes([0x1b, 0x24, 0x42]) + bcode + bytes([0x1b, 0x28, 0x42])
+                        jis2 += bcode.decode('iso2022_jp_ext')
+                jis = jis2
+            except Exception as e:
+                print(e)
+                print(jis.hex())
             out += jis.encode('utf8')
             i += 2
         else:
@@ -292,6 +307,35 @@ def n88basic_to_utf8(txt):
                 i += 1
                 if i == len(txt): break
     return out
+
+
+def mbf2ieee(mbf_4bytestring):
+    """
+    https://stackoverflow.com/questions/2268191/how-to-convert-from-ieee-python-float-to-microsoft-basic-float
+    """
+    msbin = struct.unpack('4B', mbf_4bytestring)
+    if msbin[3] == 0: return 0.0
+    ieee = [0] * 4
+    sign = msbin[2] & 0x80
+    ieee_exp = msbin[3] - 2
+    ieee[3] = sign | (ieee_exp >> 1)
+    ieee[2] = (ieee_exp << 7) & 0xFF | (msbin[2] & 0x7f)
+    ieee[:2] = msbin[:2]
+    return struct.unpack('f', bytes(ieee))[0]
+
+
+def msd2float(msd):
+    # take out values that don't make sense possibly the NaN and Infinity
+    if sum(msd) in [0, 72, 127]:
+        return 0.0
+    b = msd[:]
+    sign = msd[-2] & 0x80
+    b[-2] |= 0x80  # hidden most sig bit in place of sign
+    exp = msd[-1] - 0x80 - 56  # exponent offset
+    acc = 0
+    for i, byte in enumerate(b[:-1]):
+        acc |= byte << (i*8)
+    return (float(acc)*2.0**exp)*((1., -1.)[sign != 0])
 
 
 def detokenize(buf):
@@ -317,6 +361,8 @@ def detokenize(buf):
             if i == len(data): break
             b = data[i]
             i += 1
+            # constant tokens are partially borrowed from http://www.chebucto.ns.ca/~af380/GW-BASIC-tokens.html
+            # todo: confirm constant tokens
             if b == 0:  # comment, end of line
                 cmd += data[i:-1]
                 break
@@ -324,19 +370,31 @@ def detokenize(buf):
                 cmd += b' ' * b
             elif b >= 0x10 and b <= 0x19:  # number 0..9
                 cmd += bytes([b+0x20])
+            elif b == 0x0B:  # octal
+                val = struct.unpack("<H", data[i:i + 2])[0]
+                cmd += "&O{:o}".format(val).encode('ascii')
+                i += 2
             elif b == 0x0C:  # hex word
                 val = struct.unpack("<H", data[i:i + 2])[0]
                 cmd += "&H{:X}".format(val).encode('ascii')
                 i += 2
-            elif b == 0x0E:  # word
+            elif b == 0x0D or b == 0x0E:  # line number
                 cmd += str(struct.unpack("<H", data[i:i+2])[0]).encode('ascii')
                 i += 2
             elif b == 0x0F:  # byte
                 cmd += str(data[i]).encode('ascii')
                 i += 1
-            elif b == 0x1C:  # word (line number)
+            elif b == 0x1C:  # word
                 cmd += str(struct.unpack("<H", data[i:i+2])[0]).encode('ascii')
                 i += 2
+            elif b == 0x1D:  # four-byte single-precision floating-point
+                f = mbf2ieee(data[i:i+4])
+                cmd += "{:f}".format(f).rstrip('0').rstrip('.').encode('ascii')
+                i += 4
+            elif b == 0x1F:  # eight-byte double-precision floating-point
+                d = msd2float(data[i:i+8])
+                cmd += "{:f}".format(d).rstrip('0').rstrip('.').encode('ascii')
+                i += 8
             elif b >= ord('A') and b <= ord('z') and data[i] >=0 and data[i] <= 0x20:  # variable?
                 cmd += bytes([b])
                 varlen = data[i]

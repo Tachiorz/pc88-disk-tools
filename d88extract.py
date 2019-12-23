@@ -99,7 +99,6 @@ if __name__ == "__main__":
                     if DEBUG: print("sectors:", sector_count)
                 else:
                     sector_count = len(image.tracks_dir[head][track])
-
                 for s in range(1, sector_count + 1):
                     buf += image.tracks_dir[head][track][s]
                 if last_cluster:
@@ -110,10 +109,11 @@ if __name__ == "__main__":
                 if not os.path.exists(decompile_dir):
                     os.mkdir(decompile_dir)
                 try:
-                    dec = n88basic.decompile(buf)
+                    dec = n88basic.detokenize(buf)
+                    out = n88basic.n88basic_to_utf8(dec)
                     with open(decompile_dir + filename, 'wb') as fd:
-                        fd.write(dec)
-                except:
-                    pass
+                        fd.write(out)
+                except Exception as e:
+                    print(e)
             f.write(buf)
 

@@ -2,9 +2,301 @@ import sys
 import struct
 
 
-def decompile(buf):
+n88tokens = {
+    0x80: 'AUTO',
+    0xF8: 'AND',
+    0x10: 'ABS',
+    0x11: 'ATN',
+    0x12: 'ASC',
+    0x13: 'ATTR$',
+    0x4C: 'AKCNV$',
+    0x81: 'BSAVE',
+    0x82: 'BLOAD',
+    0x83: 'BEEP',
+    0x84: 'CONSOLE',
+    0x85: 'COPY',
+    0x86: 'CLOSE',
+    0x87: 'CONT',
+    0x88: 'CLEAR',
+    0x14: 'CSRLIN',
+    0x15: 'CINT',
+    0x16: 'CSNG',
+    0x17: 'CDBL',
+    0x18: 'CVI',
+    0x19: 'CVS',
+    0x1A: 'CVD',
+    0x1B: 'COS',
+    0x1C: 'CHR$',
+    0x89: 'CALL',
+    0x8A: 'COMMON',
+    0x8B: 'CHAIN',
+    0x8C: 'COM',
+    0x8D: 'CIRCLE',
+    0x8E: 'COLOR',
+    0x8F: 'CLS',
+    0xE8: 'CMD',
+    0x90: 'DELETE',
+    0x91: 'DATA',
+    0x92: 'DIM',
+    0x93: 'DEFSTR',
+    0x94: 'DEFINT',
+    0x95: 'DEFSNG',
+    0x96: 'DEFDBL',
+    0x97: 'DSKO$',
+    0x98: 'DEF',
+    0x41: 'DSKI$',
+    0x1D: 'DSKF',
+    0x00: 'DATE$',
+    0xA2: 'DRAW',
+    0x99: 'ELSE',
+    0x9A: 'END',
+    0x9B: 'ERASE',
+    0x9C: 'EDIT',
+    0x9D: 'ERROR',
+    0x1E: 'ERL',
+    0x1F: 'ERR',
+    0x20: 'EXP',
+    0x21: 'EOF',
+    0xFB: 'EQV',
+    0x9E: 'FOR',
+    0x9F: 'FIELD',
+    0xA0: 'FILES',
+    0xA1: 'FN',
+    0x42: 'FRE',
+    0x22: 'FIX',
+    0x23: 'FPOS',
+    0xA3: 'GOTO',
+    0xA4: 'GOSUB',
+    0xA5: 'GET',
+    0x24: 'HEX$',
+    0xA6: 'HELP',
+    0x44: 'INPUT$',
+    0xA7: 'INPUT',
+    0xA8: 'IF',
+    0x25: 'INSTR',
+    0x26: 'INT',
+    0x27: 'INP',
+    0xFC: 'IMP',
+    0x28: 'INKEY$',
+    0x4E: 'IEEE',
+    0xE9: 'IRESET',
+    0xEA: 'ISET',
+    0x45: 'JIS$',
+    0xA9: 'KEY',
+    0xAA: 'KILL',
+    0xAB: 'KANJI',
+    0xE6: 'KINPUT',
+    0x46: 'KNJ$',
+    0x47: 'KTYPE',
+    0x48: 'KLEN',
+    0x49: 'KMID$',
+    0x4A: 'KEXT$',
+    0x4B: 'KINSTR',
+    0x4D: 'KACNV$',
+    0xEE: 'KPLOAD',
+    0xAC: 'LOCATE',
+    0xAD: 'LPRINT',
+    0xE3: 'LIST',
+    0xAE: 'LLIST',
+    0x29: 'LPOS',
+    0xAF: 'LET',
+    0xB0: 'LINE',
+    0xB1: 'LOAD',
+    0xB2: 'LSET',
+    0xB3: 'LFILES',
+    0x2A: 'LOG',
+    0x2B: 'LOC',
+    0x2C: 'LEN',
+    0x2D: 'LEFT$',
+    0x2E: 'LOF',
+    0xB4: 'MOTOR',
+    0xB5: 'MERGE',
+    0xFD: 'MOD',
+    0x2F: 'MKI$',
+    0x30: 'MKS$',
+    0x31: 'MKD$',
+    0x01: 'MID$',
+    0xB6: 'MON',
+    0x32: 'MAP',
+    0xB7: 'NEXT',
+    0xB8: 'NAME',
+    0xB9: 'NEW',
+    0xBA: 'NOT',
+    0xBB: 'OPEN',
+    0xBC: 'OUT',
+    0xBD: 'ON',
+    0xF9: 'OR',
+    0x33: 'OCT$',
+    0xBE: 'OPTION',
+    0xBF: 'OFF',
+    0xC0: 'PRINT',
+    0xC1: 'PUT',
+    0xC2: 'POKE',
+    0x34: 'POS',
+    0x35: 'PEEK',
+    0xC3: 'PSET',
+    0xC4: 'PRESET',
+    0x02: 'POINT',
+    0xC5: 'PAINT',
+    0x03: 'PEN',
+    0xEB: 'POLL',
+    0xC6: 'RETURN',
+    0xC7: 'READ',
+    0xC8: 'RUN',
+    0xC9: 'RESTORE',
+    0xFF: 'REM',
+    0xCB: 'RESUME',
+    0xCC: 'RSET',
+    0x36: 'RIGHT$',
+    0x37: 'RND',
+    0xCD: 'RENUM',
+    0xCE: 'RANDOMIZE',
+    0xCF: 'ROLL',
+    0xEC: 'RBYTE',
+    0xD0: 'SCREEN',
+    0x38: 'SEARCH',
+    0xD1: 'STOP',
+    0xD2: 'SWAP',
+    0xD3: 'SAVE',
+    0xD4: 'SPC',
+    0xD5: 'STEP',
+    0x39: 'SGN',
+    0x3A: 'SQR',
+    0x3B: 'SIN',
+    0x3C: 'STR$',
+    0x3D: 'STRING$',
+    0x3E: 'SPACE$',
+    0xE4: 'SEG',
+    0xE5: 'SET',
+    0x4F: 'STATUS',
+    0xE7: 'SRQ',
+    0xD6: 'THEN',
+    0xD7: 'TRON',
+    0xD8: 'TROFF',
+    0xD9: 'TAB',
+    0xDA: 'TO',
+    0x3F: 'TAN',
+    0xDB: 'TERM',
+    0x04: 'TIME$',
+    0xDC: 'USING',
+    0xDD: 'USR',
+    0x40: 'VAL',
+    0x05: 'VIEW',
+    0x43: 'VARPTR',
+    0xDE: 'WIDTH',
+    0x06: 'WINDOW',
+    0xDF: 'WAIT',
+    0xE0: 'WHILE',
+    0xE1: 'WEND',
+    0xE2: 'WRITE',
+    0xED: 'WBYTE',
+    0xFA: 'XOR',
+    0xF3: '+',
+    0xF4: '-',
+    0xF5: '*',
+    0xF6: '/',
+    0xF7: '^',
+    0xFE: '\\',
+    0xF0: '>',
+    0xF1: '=',
+    0xF2: '<',
+}
+
+n88_unicode_table = {
+    0x80: 0x02581,
+    0x81: 0x02582,
+    0x82: 0x02583,
+    0x83: 0x02584,
+    0x84: 0x02585,
+    0x85: 0x02586,
+    0x86: 0x02587,
+    0x87: 0x02588,
+    0x88: 0x0258F,
+    0x89: 0x0258E,
+    0x8a: 0x0258D,
+    0x8b: 0x0258C,
+    0x8c: 0x0258B,
+    0x8d: 0x0258A,
+    0x8e: 0x02589,
+    0x8f: 0x0253C,
+    0x90: 0x02534,
+    0x91: 0x0252C,
+    0x92: 0x02524,
+    0x93: 0x0251C,
+    0x94: 0x02594,
+    0x95: 0x02500,
+    0x96: 0x02502,
+    0x97: 0x02595,
+    0x98: 0x0250C,
+    0x99: 0x02510,
+    0x9a: 0x02514,
+    0x9b: 0x02518,
+    0x9c: 0x025DC,
+    0x9d: 0x025DD,
+    0x9e: 0x025DF,
+    0x9f: 0x025DE,
+    0xa0: 0x025A0,  # space replacement
+    0xe0: 0x02550,
+    0xe1: 0x0255E,
+    0xe2: 0x0256A,
+    0xe3: 0x02561,
+    0xe4: 0x025E2,
+    0xe5: 0x025E3,
+    0xe6: 0x025E5,
+    0xe7: 0x025E4,
+    0xe8: 0x02660,
+    0xe9: 0x02665,
+    0xea: 0x02666,
+    0xeb: 0x02663,
+    0xec: 0x025CF,
+    0xed: 0x025CB,
+    0xee: 0x02571,
+    0xef: 0x02572,
+    0xf0: 0x02573,
+    0xf1: 0x0E001,
+    0xf2: 0x0E002,
+    0xf3: 0x0E003,
+    0xf4: 0x0E004,
+    0xf5: 0x0E005,
+    0xf6: 0x0E006,
+    0xf7: 0x0E007,
+}
+
+
+def n88basic_to_utf8(txt):
+    out = b""
+    jis = b""
+    is_jis = False
+    i = 0
+    while True:
+        if i < len(txt)-1 and txt[i] == 0x1b and txt[i + 1] == 0x4b:  # switch to 16bit encoding:
+            i += 2
+            is_jis = True
+            jis = b""
+        elif i < len(txt)-1 and txt[i] == 0x1b and txt[i + 1] == 0x48:  # switch to 8bit
+            is_jis = False
+            jis = bytes([0x1b, 0x24, 0x42]) + jis + bytes([0x1b, 0x28, 0x42])
+            jis = jis.decode('iso2022_jp_ext')
+            out += jis.encode('utf8')
+            i += 2
+        else:
+            if is_jis is True:
+                jis += txt[i:i + 2]
+                i += 2
+            else:
+                if txt[i] in n88_unicode_table:
+                    out += chr(n88_unicode_table[txt[i]]).encode('utf-8')
+                else:
+                    b = bytes([txt[i]])
+                    out += b.decode('shift-jis').encode('utf-8')
+                i += 1
+                if i == len(txt): break
+    return out
+
+
+def detokenize(buf):
     """
-    Decompile N88 BASIC bytecode
+    Detokenize N88 BASIC bytecode
     (This is complete guesswork)
     :param buf: binary basic data
     :return: decompiled basic text
@@ -25,10 +317,9 @@ def decompile(buf):
             if i == len(data): break
             b = data[i]
             i += 1
-            if b == 0:  # comment, end of code?
+            if b == 0:  # comment, end of line
                 cmd += data[i:-1]
                 break
-
             elif b > 0 and b < 10:  # spaces
                 cmd += b' ' * b
             elif b >= 0x10 and b <= 0x19:  # number 0..9
@@ -43,8 +334,7 @@ def decompile(buf):
             elif b == 0x0F:  # byte
                 cmd += str(data[i]).encode('ascii')
                 i += 1
-            elif b == 0x1C:  # word ??
-                # todo: how it's different from 0x0E?
+            elif b == 0x1C:  # word (line number)
                 cmd += str(struct.unpack("<H", data[i:i+2])[0]).encode('ascii')
                 i += 2
             elif b >= ord('A') and b <= ord('z') and data[i] >=0 and data[i] <= 0x20:  # variable?
@@ -55,118 +345,40 @@ def decompile(buf):
                 i += varlen + 1
             elif b == ord('"'):  # string
                 cmd += b'"'
-                while data[i] != ord('"'):
+                while data[i] != ord('"'):  # look for closing "
+                    if data[i] == 0x1b:  # switch encoding
+                        while True:
+                            cmd += bytes([data[i]])
+                            i += 1
+                            if data[i] == 0x1b: break
                     cmd += bytes([data[i]])
                     i += 1
                 cmd += b'"'
                 i += 1
             elif chr(b) in (':', ';', ',', '*', '#', '$', '%', '(', ')'):
-                if data[i] != 0x99:  # todo: why is that?
+                if data[i] != 0x99:  # ELSE stored with invisible colon, 3A, before it
                     cmd += bytes([b])
-            elif b == 0x82: cmd += b"BLOAD"
-            elif b == 0x84: cmd += b"CONSOLE"
-            elif b == 0x86: cmd += b"CLOSE"
-            elif b == 0x88: cmd += b"CLEAR"
-            elif b == 0x89: cmd += b"CALL"
-            elif b == 0x8E: cmd += b"COLOR"
-            elif b == 0x8F: cmd += b"CLS"
             elif b == 0x91:
                 cmd += b"DATA"
                 cmd += data[i:-1]
                 break
-            elif b == 0x92: cmd += b"DIM"
-            elif b == 0x94: cmd += b"DEFINT"
-            elif b == 0x98: cmd += b"DEF"
-            elif b == 0x99: cmd += b"ELSE"
-            elif b == 0x9B: cmd += b"ERASE"
-            elif b == 0x9D: cmd += b"ERROR"
-            elif b == 0x9E: cmd += b"FOR"
-            elif b == 0x9F: cmd += b"FIELD"
-            elif b == 0xA3: cmd += b"GOTO"
-            elif b == 0xA4: cmd += b"GOSUB"
-            elif b == 0xA5: cmd += b"GET"
-            elif b == 0xA7: cmd += b"INPUT"
-            elif b == 0xA8: cmd += b"IF"
-            elif b == 0xAC: cmd += b"LOCATE"
-            elif b == 0xB0: cmd += b"LINE"
-            elif b == 0xB7: cmd += b"NEXT"
-            elif b == 0xBB: cmd += b"OPEN"
-            elif b == 0xBC: cmd += b"OUT"
-            elif b == 0xBD: cmd += b"ON"
-            elif b == 0xBF: cmd += b"OFF"
-            elif b == 0xC0: cmd += b"PRINT"
-            elif b == 0xC2: cmd += b"POKE"
-            elif b == 0xC5: cmd += b"PAINT"
-            elif b == 0xC6: cmd += b"RETURN"
-            elif b == 0xC7: cmd += b"READ"
-            elif b == 0xC8: cmd += b"RUN"
-            elif b == 0xC9: cmd += b"RESTORE"
-            elif b == 0xCB: cmd += b"RESUME"
-            elif b == 0xCE: cmd += b"RANDOMIZE"
-            elif b == 0xD0: cmd += b"SCREEN"
-            elif b == 0xD1: cmd += b"STOP"
-            elif b == 0xD2: cmd += b"SWAP"
-            elif b == 0xD4: cmd += b"SPC"
-            elif b == 0xD5: cmd += b"STEP"
-            elif b == 0xD6: cmd += b"THEN"
-            elif b == 0xDA: cmd += b"TO"
-            elif b == 0xDE: cmd += b"WIDTH"
-            elif b == 0xDF: cmd += b"WAIT"
-            elif b == 0xE0: cmd += b"WHILE"
-            elif b == 0xE1: cmd += b"WEND"
-            elif b == 0xE2: cmd += b"WRITE"
-            elif b == 0xE4: cmd += b"SEG"
-            elif b == 0xF0: cmd += b">"
-            elif b == 0xF1: cmd += b"="
-            elif b == 0xF2: cmd += b"<"
-            elif b == 0xF3: cmd += b"+"
-            elif b == 0xF4: cmd += b"-"
-            elif b == 0xF5: cmd += b"*"
-            elif b == 0xF6: cmd += b"/"
-            elif b == 0xF8: cmd += b"AND"
-            elif b == 0xF9: cmd += b"OR"
-            elif b == 0xFD: cmd += b"MOD"
-            elif b == 0xFE: cmd += b"\\"
             elif b == 0xFF:  # function
                 b = data[i]
                 i += 1
-                if b == 0x81: cmd += b"MID$"
-                elif b == 0x84: cmd += b"TIME$"
-                elif b == 0x92: cmd += b"ASC"
-                elif b == 0x98: cmd += b"CVI"
-                elif b == 0x9C: cmd += b"CHR$"
-                elif b == 0x9E: cmd += b"ERL"
-                elif b == 0x9F: cmd += b"ERR"
-                elif b == 0xA4: cmd += b"HEX$"
-                elif b == 0xA6: cmd += b"INT"
-                elif b == 0xA8: cmd += b"INKEY$"
-                elif b == 0xAC: cmd += b"LEN"
-                elif b == 0xAD: cmd += b"LEFT$"
-                elif b == 0xAF: cmd += b"MKI$"
-                elif b == 0xB5: cmd += b"PEEK"
-                elif b == 0xB6: cmd += b"RIGHT$"
-                elif b == 0xB7: cmd += b"RND"
-                elif b == 0xBC: cmd += b"STR$"
-                elif b == 0xC0: cmd += b"VAL"
-                elif b == 0xC2: cmd += b"FRE"
-                elif b == 0xC3: cmd += b"VARPTR"
-                elif b == 0xCC: cmd += b"AKCNV$"
-                elif b == 0xCF: cmd += b"STATUS"
+                if b-0x80 in n88tokens:
+                    cmd += bytes(n88tokens[b-0x80].encode('ascii'))
                 else: print("line {}: unknown function {:X}".format(line_num, b))
+            elif b in n88tokens:
+                cmd += bytes(n88tokens[b].encode('ascii'))
             else:
-                print("line {}: unknown opcode {:X}".format(line_num, b))
+                print("line {}: unknown token {:X}".format(line_num, b))
         line = str(line_num).encode('ascii')
         if cmd[0] != 0x20: line += b' '
         line += cmd
         txt += line + b'\x0d\x0a'
-        if False:
-            if cmd != '':
-                print(line)
-            else:
-                print(length, line_num, data)
     return txt
 
 
 if __name__ == '__main__':
     with open(sys.argv[1], 'rb') as f:
-        decompile(f.read())
+        detokenize(f.read())

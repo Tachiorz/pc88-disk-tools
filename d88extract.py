@@ -91,7 +91,7 @@ if __name__ == "__main__":
             while True:
                 if DEBUG: print(cluster, end=",")
 
-                last_cluster = FAT[cluster] >= 0xC1 and FAT[cluster] < 0xDA
+                last_cluster = FAT[cluster] >= 0xC1 and FAT[cluster] <= 0xDA
 
                 head, track = cluster_to_head_track(cluster)
                 if last_cluster:
@@ -104,7 +104,8 @@ if __name__ == "__main__":
                 if last_cluster:
                     break
                 cluster = FAT[cluster]
-            if decompile:
+            f.write(buf)
+            if decompile and di.attribute != 1:
                 decompile_dir = output_dir + 'decompile\\'
                 if not os.path.exists(decompile_dir):
                     os.mkdir(decompile_dir)
@@ -115,5 +116,4 @@ if __name__ == "__main__":
                         fd.write(out)
                 except Exception as e:
                     print(e)
-            f.write(buf)
 

@@ -283,11 +283,16 @@ def n88basic_to_utf8(txt):
                 for j in range(0,len(jis), 2):
                     bcode = jis[j:j+2]
                     code = struct.unpack('<H', bcode)[0]
-                    if code in n88_2byte_unicode_table:
-                        jis2 += chr(n88_2byte_unicode_table[code])
-                    else:
+                    #if code in n88_2byte_unicode_table:
+                    #    jis2 += chr(n88_2byte_unicode_table[code])
+                    #else:
+                    try:
                         bcode = bytes([0x1b, 0x24, 0x42]) + bcode + bytes([0x1b, 0x28, 0x42])
                         jis2 += bcode.decode('iso2022_jp_ext')
+                    except:
+                        # todo: this is getting ridiculous
+                        print("Unknown character:", hex(code))
+                        jis2 += chr(0x0F0000 & code)
                 jis = jis2
             except Exception as e:
                 print(e)
@@ -411,6 +416,8 @@ def detokenize(buf):
                             if data[i] == 0x1b: break
                     cmd += bytes([data[i]])
                     i += 1
+                    if data[i] == 0: break
+                if data[i] == 0: break
                 cmd += b'"'
                 i += 1
             elif chr(b) in (':', ';', ',', '*', '#', '$', '%', '(', ')'):

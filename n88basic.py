@@ -278,26 +278,18 @@ def n88basic_to_utf8(txt):
             jis = b""
         elif i < len(txt)-1 and txt[i] == 0x1b and txt[i + 1] == 0x48:  # switch to 8bit
             is_jis = False
-            try:
-                jis2 = ""
-                for j in range(0,len(jis), 2):
-                    bcode = jis[j:j+2]
-                    code = struct.unpack('<H', bcode)[0]
-                    #if code in n88_2byte_unicode_table:
-                    #    jis2 += chr(n88_2byte_unicode_table[code])
-                    #else:
-                    try:
-                        bcode = struct.pack('<H', code & 0x7FFF)  # todo: why is that?
-                        bcode = bytes([0x1b, 0x24, 0x42]) + bcode + bytes([0x1b, 0x28, 0x42])
-                        jis2 += bcode.decode('iso2022_jp_ext')
-                    except:
-                        # todo: this is getting ridiculous
-                        print("Unknown character:", hex(code))
-                        jis2 += chr(0x0F0000 & code)
-                jis = jis2
-            except Exception as e:
-                print(e)
-                print(jis.hex())
+            jis2 = ""
+            for j in range(0,len(jis), 2):
+                code = struct.unpack('<H', jis[j:j+2])[0]
+                try:
+                    bcode = struct.pack('<H', code & 0x7FFF)  # todo: why is that?
+                    bcode = bytes([0x1b, 0x24, 0x42]) + bcode + bytes([0x1b, 0x28, 0x42])
+                    jis2 += bcode.decode('iso2022_jp_ext')
+                except:
+                    # todo: this is getting ridiculous
+                    print("Unknown character:", hex(code))
+                    jis2 += chr(0x0F0000 & code)
+            jis = jis2
             out += jis.encode('utf8')
             i += 2
         else:

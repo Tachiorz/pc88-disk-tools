@@ -287,6 +287,7 @@ def n88basic_to_utf8(txt):
                     #    jis2 += chr(n88_2byte_unicode_table[code])
                     #else:
                     try:
+                        bcode = struct.pack('<H', code & 0x7FFF)  # todo: why is that?
                         bcode = bytes([0x1b, 0x24, 0x42]) + bcode + bytes([0x1b, 0x28, 0x42])
                         jis2 += bcode.decode('iso2022_jp_ext')
                     except:
